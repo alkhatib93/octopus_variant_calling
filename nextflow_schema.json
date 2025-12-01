@@ -1,41 +1,58 @@
 {
-    "$schema": "https://raw.githubusercontent.com/nextflow-io/nextflow/master/assets/json-schema/nextflow-schema.json",
-    "$id": "https://raw.githubusercontent.com/alkhatib93/octopus_variant_calling/main/nextflow_schema.json",
-    "title": "octopus_variant_calling",
-    "description": "Small Nextflow pipeline that runs the Octopus variant caller on BAM files.",
-    "type": "object",
-    "properties": {
-      "input": {
-        "type": "string",
-        "description": "Path to input samplesheet CSV (columns: sample_id,bam).",
-        "default": "assets/samplesheet.csv",
-        "pattern": ".*\\.csv$"
-      },
-      "outdir": {
-        "type": "string",
-        "description": "Directory for all pipeline outputs.",
-        "default": "results"
-      },
-      "reference": {
-        "type": "string",
-        "description": "Reference genome FASTA used by Octopus (-R).",
-        "default": "",
-        "minLength": 1
-      },
-      "octopus_args": {
-        "type": "string",
-        "description": "Additional arguments passed directly to Octopus.",
-        "default": ""
-      },
-      "help": {
-        "type": "boolean",
-        "description": "Print usage information and exit.",
-        "default": false
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/alkhatib93/octopus_variant_calling/main/nextflow_schema.json",
+  "title": "octopus_variant_calling parameters",
+  "description": "Small Nextflow pipeline that runs the Octopus variant caller on BAM files.",
+  "type": "object",
+
+  "$defs": {
+    "io_options": {
+      "title": "Input / Output",
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "title": "Samplesheet CSV",
+          "description": "CSV file with columns: sample_id,bam.",
+          "mimetype": "text/csv",
+          "format": "file-path",
+          "pattern": "^\\S*\\.csv$",
+          "default": "assets/samplesheet.csv"
+        },
+        "outdir": {
+          "type": "string",
+          "title": "Output directory",
+          "description": "Where to write Octopus results.",
+          "format": "directory-path",
+          "default": "results"
+        },
+        "reference": {
+          "type": "string",
+          "title": "Reference genome FASTA",
+          "description": "Reference FASTA used by Octopus (-R). Should match the reference used by Sarek.",
+          "format": "file-path"
+        },
+        "octopus_args": {
+          "type": "string",
+          "title": "Extra Octopus arguments",
+          "description": "Additional arguments passed directly to Octopus.",
+          "default": ""
+        },
+        "help": {
+          "type": "boolean",
+          "title": "Show help and exit",
+          "description": "Print usage message instead of running the pipeline.",
+          "default": false
+        }
       }
-    },
-    "required": [
-      "input",
-      "reference"
-    ]
-  }
-  
+    }
+  },
+
+  "allOf": [
+    { "$ref": "#/$defs/io_options" }
+  ],
+
+  "required": ["input", "reference"],
+
+  "additionalProperties": true
+}

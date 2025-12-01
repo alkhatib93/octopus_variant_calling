@@ -63,6 +63,7 @@ Channel
         if (!row.bam) {
             error "Samplesheet is missing 'bam' column or has empty values."
         }
+
         def sample_id = row.sample_id as String
         def bam_path  = file(row.bam)
 
@@ -70,7 +71,14 @@ Channel
             error "BAM file for sample '${sample_id}' not found: ${bam_path}"
         }
 
-        tuple(sample_id, bam_path)
+        // Look for BAM index in the same directory: <bam>.bai
+        def bai_path = file(bam_path.toString() + '.bai')
+        if (!bai_path.exists()) {
+            error "BAM index (.bai) for sample '${sample_id}' not found: ${bai_path}"
+        }
+
+        // pass both bam and bai
+        tuple(sample_id, bam_path, bai_path)
     }
     .set { ch_samples }
 
@@ -87,7 +95,7 @@ process OCTOPUS {
     memory '8 GB'
 
     input:
-    tuple val(sample_id), path(bam)
+    tuple val(sample_id), path(bam), path(bai)
 
     output:
     path "${sample_id}.octopus.vcf.gz", emit: vcf

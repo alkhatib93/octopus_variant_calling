@@ -53,6 +53,9 @@ if (!file(params.input).exists()) {
 // ---------------------------
 // Channels
 // ---------------------------
+// ---------------------------
+// Channels
+// ---------------------------
 Channel
     .fromPath(params.input)
     .splitCsv(header: true)
@@ -65,22 +68,28 @@ Channel
         }
 
         def sample_id = row.sample_id as String
-        def bam_path  = file(row.bam)
+        def bam       = file(row.bam)
 
-        if (!bam_path.exists()) {
-            error "BAM file for sample '${sample_id}' not found: ${bam_path}"
+        if (!bam.exists()) {
+            error "BAM file for sample '${sample_id}' not found: ${bam}"
         }
 
-        // Look for BAM index in the same directory: <bam>.bai
-        def bai_path = file(bam_path.toString() + '.bai')
-        if (!bai_path.exists()) {
-            error "BAM index (.bai) for sample '${sample_id}' not found: ${bai_path}"
+        // If a 'bai' column is provided, use it; else derive from BAM path
+        def bai = row.bai ? file(row.bai) : file("${bam}.bai")
+
+        if (!bai.exists()) {
+            // Try alternative pattern: <bam.parent>/<bam.baseName>.bai
+            def altBai = file("${bam.parent}/${bam.baseName}.bai")
+            if (!altBai.exists()) {
+                error "BAI index not found for sample '${sample_id}'. Tried: ${bai} and ${altBai}"
+            }
+            bai = altBai
         }
 
-        // pass both bam and bai
-        tuple(sample_id, bam_path, bai_path)
+        tuple(sample_id, bam, bai)
     }
     .set { ch_samples }
+
 
 // ---------------------------
 // Processes
@@ -106,6 +115,10 @@ process OCTOPUS {
 
     script:
     """
+    if [ ! -e "${bam}.bai" ]; then
+      ln -s "${bai}" "${bam}.bai"
+    fi
+    
     octopus \\
       -R ${params.reference} \\
       -I ${bam} \\

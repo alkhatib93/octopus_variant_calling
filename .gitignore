@@ -1,0 +1,16 @@
+work/
+results/
+.cache/
+.conda/
+.nextflow*
+trace.txt
+timeline.html
+report.html
+dag.png
+
+# OS
+.DS_Store
+
+# Python/Conda
+envs/*/lib/
+*.log

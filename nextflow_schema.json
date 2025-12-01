@@ -1,6 +1,7 @@
 {
     "$schema": "https://raw.githubusercontent.com/nextflow-io/nextflow/master/assets/json-schema/nextflow-schema.json",
-    "title": "octopus_call",
+    "$id": "https://raw.githubusercontent.com/alkhatib93/octopus_variant_calling/main/nextflow_schema.json",
+    "title": "octopus_variant_calling",
     "description": "Small Nextflow pipeline that runs the Octopus variant caller on BAM files.",
     "type": "object",
     "properties": {

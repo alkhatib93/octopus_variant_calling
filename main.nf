@@ -16,8 +16,8 @@ def helpMessage = """
 octopus_call – Small Nextflow pipeline running Octopus on BAM files
 
 Required:
-  --input        Path to samplesheet CSV (columns: sample_id,bam)
-  --reference    Reference genome FASTA used for Octopus
+  --input        Path to samplesheet CSV (columns: sample_id,bam[,bai])
+  --reference    Reference genome FASTA (.fa) used for Octopus
 
 Optional:
   --outdir       Output directory (default: results)
@@ -26,7 +26,7 @@ Optional:
 Example:
   nextflow run main.nf \\
     --input assets/samplesheet.csv \\
-    --reference data/genome.fa \\
+    --reference data/GRCh38_chr22.fa \\
     --outdir results
 """
 
@@ -46,13 +46,22 @@ if (!file(params.reference).exists()) {
     error "Reference FASTA not found: ${params.reference}"
 }
 
+if (!file(params.reference + ".fai").exists()) {
+    error "Reference FASTA index (.fai) not found: ${params.reference}.fai"
+}
+
 if (!file(params.input).exists()) {
     error "Samplesheet not found: ${params.input}"
 }
 
-// ---------------------------
-// Channels
-// ---------------------------
+// Create file objects
+def reference_fa  = file(params.reference)
+def reference_fai = file(params.reference + ".fai")
+
+// Create channel for reference + fai
+Channel.value(reference_fa).set { ch_reference_fa }
+Channel.value(reference_fai).set { ch_reference_fai }
+
 // ---------------------------
 // Channels
 // ---------------------------
@@ -60,36 +69,29 @@ Channel
     .fromPath(params.input)
     .splitCsv(header: true)
     .map { row ->
-        if (!row.sample_id) {
-            error "Samplesheet is missing 'sample_id' column or has empty values."
-        }
-        if (!row.bam) {
-            error "Samplesheet is missing 'bam' column or has empty values."
-        }
+        if (!row.sample_id) error "Samplesheet missing 'sample_id'"
+        if (!row.bam)       error "Samplesheet missing 'bam'"
 
         def sample_id = row.sample_id as String
         def bam       = file(row.bam)
 
         if (!bam.exists()) {
-            error "BAM file for sample '${sample_id}' not found: ${bam}"
+            error "BAM not found for ${sample_id}: ${bam}"
         }
 
-        // If a 'bai' column is provided, use it; else derive from BAM path
+        // Use bai column if present, else try <bam>.bai
         def bai = row.bai ? file(row.bai) : file("${bam}.bai")
 
         if (!bai.exists()) {
-            // Try alternative pattern: <bam.parent>/<bam.baseName>.bai
+            // fallback: <bam_base>.bai
             def altBai = file("${bam.parent}/${bam.baseName}.bai")
-            if (!altBai.exists()) {
-                error "BAI index not found for sample '${sample_id}'. Tried: ${bai} and ${altBai}"
-            }
-            bai = altBai
+            if (altBai.exists()) bai = altBai
+            else error "BAI not found for ${sample_id}. Tried: ${bai} and ${altBai}"
         }
 
         tuple(sample_id, bam, bai)
     }
     .set { ch_samples }
-
 
 // ---------------------------
 // Processes
@@ -105,27 +107,34 @@ process OCTOPUS {
 
     input:
     tuple val(sample_id), path(bam), path(bai)
+    path reference_fa
+    path reference_fai
 
     output:
     path "${sample_id}.octopus.vcf.gz", emit: vcf
     path "${sample_id}.octopus.vcf.gz.tbi", optional: true, emit: tbi
 
-    when:
-    bam
-
     script:
     """
+    echo "=== Running Octopus on ${sample_id} ==="
+    echo "BAM       : ${bam}"
+    echo "BAI       : ${bai}"
+    echo "Reference : ${reference_fa}"
+    echo "Index     : ${reference_fai}"
+
+    # Ensure BAM and index have matching names inside work dir
     if [ ! -e "${bam}.bai" ]; then
       ln -s "${bai}" "${bam}.bai"
     fi
-    
+
     octopus \\
-      -R ${params.reference} \\
+      -R ${reference_fa} \\
       -I ${bam} \\
       -o ${sample_id}.octopus.vcf.gz \\
       ${params.octopus_args}
     """
 }
+
 
 // ---------------------------
 // Workflow definition
@@ -137,5 +146,5 @@ workflow {
     log.info "Reference   : ${params.reference}"
     log.info "Outdir      : ${params.outdir}"
 
-    OCTOPUS(ch_samples)
+    OCTOPUS(ch_samples, ch_reference_fa, ch_reference_fai)
 }

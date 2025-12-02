@@ -105,6 +105,8 @@ process OCTOPUS {
     cpus 4
     memory '8 GB'
 
+    stageInMode 'copy'
+
     input:
     tuple val(sample_id), path(bam), path(bai)
     path reference_fa
